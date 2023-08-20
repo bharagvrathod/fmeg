@@ -13,7 +13,7 @@ source activate pytorch160
 
 nvidia-smi
 
-cd /home/xinqifan2/Project/first-order-model
+cd C:\Users\FREAD\Downloads\FMEG\FMEG
 
 # casme
 # python demo.py  --config config/camse2-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/casme2_challenge_256_png/Surprise_EP01_13.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_westernMale.jpg --checkpoint checkpoints_camse/00000499-checkpoint.pth.tar --relative --adapt_scale --result_video Surprise_EP01_13_westernMale.mp4
@@ -21,7 +21,7 @@ cd /home/xinqifan2/Project/first-order-model
 
 
 # smic
-python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/Smic_challenge_256_png/Negative_s11_ne_02.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_westernMale.jpg --checkpoint checkpoints_samm/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Negative_s11_ne_02_westernMale.mp4
+python demo.py  --config config/smic-256.yaml --driving_video ../Downloads\first-order-motion-model-20230813T102154Z-001\first-order-motion-model\10.mp4 --source_image ../Downloads\first-order-motion-model-20230813T102154Z-001\first-order-motion-model\01.png --checkpoint checkpoints_samm/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Negative_s11_ne_02_westernMale.mp4
 python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/Smic_challenge_256_png/Negative_s11_ne_02.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_asianFemale.jpg --checkpoint checkpoints_samm/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Negative_s11_ne_02_asianFemale.mp4
 
 python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/Smic_challenge_256_png/Positive_s3_po_05.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_westernMale.jpg --checkpoint checkpoints_samm/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Positive_s3_po_05_westernMale.mp4
@@ -43,3 +43,4 @@ python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Ge
 python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/SAMM_challenge_256_png/Surprise_007_7_1.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_westernMale.jpg --checkpoint checkpoints/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Surprise_007_7_1_westernMale.mp4
 python demo.py  --config config/smic-256.yaml --driving_video ../../Data/Face_Generation/MEGC2021_generation_video/source_samples/SAMM_challenge_256_png/Surprise_007_7_1.mp4 --source_image ../../Data/Face_Generation/MEGC2021_generation/target_template_face/normalized_asianFemale.jpg --checkpoint checkpoints/00000449-checkpoint.pth.tar --relative --adapt_scale --result_video Surprise_007_7_1_asianFemale.mp4
  
+

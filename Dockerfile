@@ -10,5 +10,4 @@ WORKDIR /app
 RUN pip3 install --upgrade pip
 RUN pip3 install \
   https://download.pytorch.org/whl/cu100/torch-1.0.0-cp36-cp36m-linux_x86_64.whl \
-  git+https://github.com/1adrianb/face-alignment \
-  -r requirements.txt
+  git+opencv-python+scipy+numba+scikit-image

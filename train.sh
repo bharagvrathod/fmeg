@@ -13,7 +13,7 @@ source activate pytorch160
 
 nvidia-smi
 
-cd /home/xinqifan2/Project/first-order-model
+cd C:\Users\FREAD\Downloads\FMEG\FMEG
 
 # camse2
 # python run.py --config config/camse2-256.yaml --checkpoint checkpoints_camse/vox-cpk.pth.tar

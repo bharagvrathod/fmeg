@@ -1,5 +1,5 @@
 dataset_params:
-  root_dir: ../../Data/Face_Generation/SAMM/SAMM_fom
+  root_dir: ../../C:\Users\FREAD\Downloads\Copy of SAMM Long
   frame_shape: [256, 256, 3]
   id_sampling: False
   # pairs_list: data/vox256.csv
