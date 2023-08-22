@@ -4,20 +4,20 @@ import torch.nn.functional as F
 from modules.util import ResBlock2d, SameBlock2d, UpBlock2d, DownBlock2d
 from modules.dense_motion import DenseMotionNetwork
 
-
 class OcclusionAwareGenerator(nn.Module):
     """
-    Generator that given source image and and keypoints try to transform image according to movement trajectories
-    induced by keypoints. Generator follows Johnson architecture.
+    Generator that given source image and keypoints tries to transform the image according to movement trajectories
+    induced by keypoints. The generator follows the Johnson architecture.
     """
 
     def __init__(self, num_channels, num_kp, block_expansion, max_features, num_down_blocks,
-                 num_bottleneck_blocks, estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
+                 num_bottleneck_blocks, estimate_occlusion_map=False, dense_motion_params=None, estimate_hessian=False):
         super(OcclusionAwareGenerator, self).__init__()
 
         if dense_motion_params is not None:
             self.dense_motion_network = DenseMotionNetwork(num_kp=num_kp, num_channels=num_channels,
                                                            estimate_occlusion_map=estimate_occlusion_map,
+                                                           estimate_hessian=estimate_hessian,
                                                            **dense_motion_params)
         else:
             self.dense_motion_network = None

@@ -11,12 +11,12 @@ from skimage.transform import resize
 from skimage import img_as_ubyte
 import torch
 from sync_batchnorm import DataParallelWithCallback
+from scipy.spatial import ConvexHull
 
 from modules.generator import OcclusionAwareGenerator
 from modules.keypoint_detector import KPDetector
 from animate import normalize_kp
 from scipy.spatial import ConvexHull
-
 
 if sys.version_info[0] < 3:
     raise Exception("You must use Python 3 or higher. Recommended version is Python 3.7")
@@ -24,7 +24,7 @@ if sys.version_info[0] < 3:
 def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
     with open(config_path) as f:
-        config = yaml.load(f)
+        config = yaml.load(f, Loader=yaml.FullLoader)  # Use FullLoader for PyYAML > 5.1
 
     generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                         **config['model_params']['common_params'])
@@ -53,8 +53,14 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     
     return generator, kp_detector
 
-
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
+    def hessian(y, x, create_graph=False):
+        gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=torch.ones_like(y))[0]
+        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
+                        for i in range(gradient.size(-1))]
+        hessian = torch.cat(hessian_rows, dim=-3)
+        return hessian
+
     with torch.no_grad():
         predictions = []
         source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
@@ -71,9 +77,12 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
             kp_driving = kp_detector(driving_frame)
             kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
                                    kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
-                                   use_relative_jacobian=relative, adapt_movement_scale=adapt_movement_scale)
-            out = generator(source, kp_source=kp_source, kp_driving=kp_norm)
-
+                                   use_relative_hessian=relative, adapt_movement_scale=adapt_movement_scale)  # Change: use_relative_hessian
+            
+            kp_norm_hessian = hessian(kp_norm, driving_frame)
+            
+            out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)  # Use Hessian gradient  # Change: kp_norm_hessian
+            
             predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
     return predictions
 
@@ -154,4 +163,3 @@ if __name__ == "__main__":
     else:
         predictions = make_animation(source_image, driving_video, generator, kp_detector, relative=opt.relative, adapt_movement_scale=opt.adapt_scale, cpu=opt.cpu)
     imageio.mimsave(opt.result_video, [img_as_ubyte(frame) for frame in predictions], fps=fps)
-

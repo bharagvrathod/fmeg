@@ -102,7 +102,7 @@ class Transform:
             control_points = self.control_points.type(coordinates.type())
             control_params = self.control_params.type(coordinates.type())
             distances = coordinates.view(coordinates.shape[0], -1, 1, 2) - control_points.view(1, 1, -1, 2)
-            distances = torch.abs(distances).sum(-1)
+            distances = torch.norm(distances, dim=-1)  # Euclidean distances
 
             result = distances ** 2
             result = result * torch.log(distances + 1e-6)
@@ -112,12 +112,25 @@ class Transform:
 
         return transformed
 
-    def jacobian(self, coordinates):
+    def hessian(self, coordinates):
         new_coordinates = self.warp_coordinates(coordinates)
-        grad_x = grad(new_coordinates[..., 0].sum(), coordinates, create_graph=True)
-        grad_y = grad(new_coordinates[..., 1].sum(), coordinates, create_graph=True)
-        jacobian = torch.cat([grad_x[0].unsqueeze(-2), grad_y[0].unsqueeze(-2)], dim=-2)
-        return jacobian
+        hessian_x = hessian(new_coordinates[..., 0].sum(), coordinates)
+        hessian_y = hessian(new_coordinates[..., 1].sum(), coordinates)
+        hessian = torch.cat([hessian_x.unsqueeze(-3), hessian_y.unsqueeze(-3)], dim=-3)
+        return hessian
+
+
+    def hessian(y, x, create_graph=False):
+        """
+        Compute the Hessian matrix of y with respect to x.
+        """
+        grad_y = grad(y, x, create_graph=True)[0]
+        grad_flat = grad_y.view(-1, grad_y.size(-1))
+        hessian_rows = [grad(gf, x, create_graph=create_graph)[0].view(1, *x.size())
+                        for gf in grad_flat]
+        hessian = torch.cat(hessian_rows, dim=0)
+        return hessian
+
 
 
 def detach_kp(kp):
@@ -126,7 +139,7 @@ def detach_kp(kp):
 
 class GeneratorFullModel(torch.nn.Module):
     """
-    Merge all generator related updates into single model for better multi-gpu usage
+    Merge all generator related updates into a single model for better multi-GPU usage
     """
 
     def __init__(self, kp_extractor, generator, discriminator, train_params):
@@ -192,7 +205,7 @@ class GeneratorFullModel(torch.nn.Module):
                         value_total += self.loss_weights['feature_matching'][i] * value
                     loss_values['feature_matching'] = value_total
 
-        if (self.loss_weights['equivariance_value'] + self.loss_weights['equivariance_jacobian']) != 0:
+        if (self.loss_weights['equivariance_value'] + self.loss_weights['equivariance_hessian']) != 0:
             transform = Transform(x['driving'].shape[0], **self.train_params['transform_params'])
             transformed_frame = transform.transform_frame(x['driving'])
             transformed_kp = self.kp_extractor(transformed_frame)
@@ -205,26 +218,26 @@ class GeneratorFullModel(torch.nn.Module):
                 value = torch.abs(kp_driving['value'] - transform.warp_coordinates(transformed_kp['value'])).mean()
                 loss_values['equivariance_value'] = self.loss_weights['equivariance_value'] * value
 
-            ## jacobian loss part
-            if self.loss_weights['equivariance_jacobian'] != 0:
-                jacobian_transformed = torch.matmul(transform.jacobian(transformed_kp['value']),
-                                                    transformed_kp['jacobian'])
+            ## Hessian loss part
+            if self.loss_weights['equivariance_hessian'] != 0:
+                hessian_transformed = torch.matmul(transform.hessian(transformed_kp['value']),
+                                                   transformed_kp['hessian'])
 
-                normed_driving = torch.inverse(kp_driving['jacobian'])
-                normed_transformed = jacobian_transformed
+                normed_driving = torch.inverse(kp_driving['hessian'])
+                normed_transformed = hessian_transformed
                 value = torch.matmul(normed_driving, normed_transformed)
 
                 eye = torch.eye(2).view(1, 1, 2, 2).type(value.type())
 
                 value = torch.abs(eye - value).mean()
-                loss_values['equivariance_jacobian'] = self.loss_weights['equivariance_jacobian'] * value
+                loss_values['equivariance_hessian'] = self.loss_weights['equivariance_hessian'] * value
 
         return loss_values, generated
 
 
 class DiscriminatorFullModel(torch.nn.Module):
     """
-    Merge all discriminator related updates into single model for better multi-gpu usage
+    Merge all discriminator related updates into a single model for better multi-GPU usage
     """
 
     def __init__(self, kp_extractor, generator, discriminator, train_params):
@@ -257,3 +270,4 @@ class DiscriminatorFullModel(torch.nn.Module):
         loss_values['disc_gan'] = value_total
 
         return loss_values
+

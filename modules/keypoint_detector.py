@@ -1,17 +1,13 @@
-from torch import nn
 import torch
-import torch.nn.functional as F
-from modules.util import Hourglass, make_coordinate_grid, AntiAliasInterpolation2d
-
 
 class KPDetector(nn.Module):
     """
-    Detecting a keypoints. Return keypoint position and jacobian near each keypoint.
+    Detecting a keypoints. Return keypoint position and Hessian near each keypoint.
     """
 
     def __init__(self, block_expansion, num_kp, num_channels, max_features,
-                 num_blocks, temperature, estimate_jacobian=False, scale_factor=1,
-                 single_jacobian_map=False, pad=0):
+                 num_blocks, temperature, estimate_hessian=False, scale_factor=1,
+                 single_hessian_map=False, pad=0):
         super(KPDetector, self).__init__()
 
         self.predictor = Hourglass(block_expansion, in_features=num_channels,
@@ -20,14 +16,14 @@ class KPDetector(nn.Module):
         self.kp = nn.Conv2d(in_channels=self.predictor.out_filters, out_channels=num_kp, kernel_size=(7, 7),
                             padding=pad)
 
-        if estimate_jacobian:
-            self.num_jacobian_maps = 1 if single_jacobian_map else num_kp
-            self.jacobian = nn.Conv2d(in_channels=self.predictor.out_filters,
-                                      out_channels=4 * self.num_jacobian_maps, kernel_size=(7, 7), padding=pad)
-            self.jacobian.weight.data.zero_()
-            self.jacobian.bias.data.copy_(torch.tensor([1, 0, 0, 1] * self.num_jacobian_maps, dtype=torch.float))
+        if estimate_hessian:
+            self.num_hessian_maps = 1 if single_hessian_map else num_kp
+            self.hessian = nn.Conv2d(in_channels=self.predictor.out_filters,
+                                     out_channels=10 * self.num_hessian_maps, kernel_size=(7, 7), padding=pad)
+            self.hessian.weight.data.zero_()
+            self.hessian.bias.data.zero_()
         else:
-            self.jacobian = None
+            self.hessian = None
 
         self.temperature = temperature
         self.scale_factor = scale_factor
@@ -60,16 +56,25 @@ class KPDetector(nn.Module):
 
         out = self.gaussian2kp(heatmap)
 
-        if self.jacobian is not None:
-            jacobian_map = self.jacobian(feature_map)
-            jacobian_map = jacobian_map.reshape(final_shape[0], self.num_jacobian_maps, 4, final_shape[2],
-                                                final_shape[3])
+        if self.hessian is not None:
+            hessian_map = self.hessian(feature_map)
+            hessian_map = hessian_map.reshape(final_shape[0], self.num_hessian_maps, 10, final_shape[2],
+                                              final_shape[3])
             heatmap = heatmap.unsqueeze(2)
 
-            jacobian = heatmap * jacobian_map
-            jacobian = jacobian.view(final_shape[0], final_shape[1], 4, -1)
-            jacobian = jacobian.sum(dim=-1)
-            jacobian = jacobian.view(jacobian.shape[0], jacobian.shape[1], 2, 2)
-            out['jacobian'] = jacobian
+            hessian = heatmap * hessian_map
+            hessian = hessian.view(final_shape[0], final_shape[1], 10, -1)
+
+            hessian_matrices = []
+            for i in range(0, 10, 3):
+                hessian_matrix = hessian[:, :, i:i+3, :]
+                hessian_matrix = hessian_matrix.sum(dim=-1)
+                hessian_matrices.append(hessian_matrix)
+
+            hessian_matrices = torch.stack(hessian_matrices, dim=-1)
+            hessian_matrices = hessian_matrices.view(hessian_matrices.shape[0], hessian_matrices.shape[1], 3, 3, -1)
+            hessian_matrices = hessian_matrices.sum(dim=-1)
+            
+            out['hessian'] = hessian_matrices
 
         return out

@@ -46,25 +46,27 @@ class DenseMotionNetwork(nn.Module):
 
     def create_sparse_motions(self, source_image, kp_driving, kp_source):
         """
-        Eq 4. in the paper T_{s<-d}(z)
+        Modified function to use Hessian derivative instead of Jacobian derivative.
         """
         bs, _, h, w = source_image.shape
         identity_grid = make_coordinate_grid((h, w), type=kp_source['value'].type())
         identity_grid = identity_grid.view(1, 1, h, w, 2)
         coordinate_grid = identity_grid - kp_driving['value'].view(bs, self.num_kp, 1, 1, 2)
-        if 'jacobian' in kp_driving:
-            jacobian = torch.matmul(kp_source['jacobian'], torch.inverse(kp_driving['jacobian']))
-            jacobian = jacobian.unsqueeze(-3).unsqueeze(-3)
-            jacobian = jacobian.repeat(1, 1, h, w, 1, 1)
-            coordinate_grid = torch.matmul(jacobian, coordinate_grid.unsqueeze(-1))
+        
+        if 'hessian' in kp_driving:  # Using Hessian derivative
+            hessian = kp_source['hessian'].view(bs, self.num_kp, 2, 2)
+            hessian = hessian.unsqueeze(-3).unsqueeze(-4)
+            hessian = hessian.repeat(1, 1, h, w, 1, 1)
+            coordinate_grid = torch.matmul(hessian, coordinate_grid.unsqueeze(-1))
             coordinate_grid = coordinate_grid.squeeze(-1)
 
         driving_to_source = coordinate_grid + kp_source['value'].view(bs, self.num_kp, 1, 1, 2)
 
-        #adding background feature
+        # Adding background feature
         identity_grid = identity_grid.repeat(bs, 1, 1, 1, 1)
         sparse_motions = torch.cat([identity_grid, driving_to_source], dim=1)
         return sparse_motions
+
 
     def create_deformed_source_image(self, source_image, sparse_motions):
         """
