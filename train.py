@@ -72,7 +72,7 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
                     losses_discriminator = {}
 
                 losses_generator.update(losses_discriminator)
-                losses = {key: value.mean().detach().data.cpu().numpy() for key, value in losses_generator.items()}
+                losses = {key.replace("jacobian", "hessian"): value.mean().detach().data.cpu().numpy() for key, value in losses_generator.items()}
                 logger.log_iter(losses=losses)
 
             scheduler_generator.step()
