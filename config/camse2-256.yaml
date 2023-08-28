@@ -13,12 +13,11 @@ dataset_params:
       saturation: 0.1
       hue: 0.1
 
-
 model_params:
   common_params:
     num_kp: 10
     num_channels: 3
-    estimate_jacobian: True
+    estimate_hessian: True  # Change estimate_jacobian to estimate_hessian
   kp_detector_params:
      temperature: 0.1
      block_expansion: 32
@@ -63,7 +62,7 @@ train_params:
     feature_matching: [10, 10, 10, 10]
     perceptual: [10, 10, 10, 10, 10]
     equivariance_value: 10
-    equivariance_jacobian: 10
+    equivariance_hessian: 10  # Change equivariance_jacobian to equivariance_hessian
 
 reconstruction_params:
   num_videos: 1000
@@ -75,7 +74,7 @@ animate_params:
   normalization_params:
     adapt_movement_scale: False
     use_relative_movement: True
-    use_relative_jacobian: True
+    use_relative_hessian: True  # Change use_relative_jacobian to use_relative_hessian
 
 visualizer_params:
   kp_size: 5
