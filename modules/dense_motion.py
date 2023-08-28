@@ -6,11 +6,11 @@ from modules.util import Hourglass, AntiAliasInterpolation2d, make_coordinate_gr
 
 class DenseMotionNetwork(nn.Module):
     """
-    Module that predicting a dense motion from sparse motion representation given by kp_source and kp_driving
+    Module that predicts dense motion from sparse motion representation given by kp_source and kp_driving
     """
 
     def __init__(self, block_expansion, num_blocks, max_features, num_kp, num_channels, estimate_occlusion_map=False,
-                 scale_factor=1, kp_variance=0.01):
+                 scale_factor=1, kp_variance=0.01, estimate_hessian=False):  # Add estimate_hessian parameter
         super(DenseMotionNetwork, self).__init__()
         self.hourglass = Hourglass(block_expansion=block_expansion, in_features=(num_kp + 1) * (num_channels + 1),
                                    max_features=max_features, num_blocks=num_blocks)
@@ -29,31 +29,26 @@ class DenseMotionNetwork(nn.Module):
         if self.scale_factor != 1:
             self.down = AntiAliasInterpolation2d(num_channels, self.scale_factor)
 
+        self.estimate_hessian = estimate_hessian  # Store the estimate_hessian parameter
+
     def create_heatmap_representations(self, source_image, kp_driving, kp_source):
-        """
-        Eq 6. in the paper H_k(z)
-        """
         spatial_size = source_image.shape[2:]
         gaussian_driving = kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance)
         gaussian_source = kp2gaussian(kp_source, spatial_size=spatial_size, kp_variance=self.kp_variance)
         heatmap = gaussian_driving - gaussian_source
 
-        #adding background feature
         zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1]).type(heatmap.type())
         heatmap = torch.cat([zeros, heatmap], dim=1)
         heatmap = heatmap.unsqueeze(2)
         return heatmap
 
     def create_sparse_motions(self, source_image, kp_driving, kp_source):
-        """
-        Modified function to use Hessian derivative instead of Jacobian derivative.
-        """
         bs, _, h, w = source_image.shape
         identity_grid = make_coordinate_grid((h, w), type=kp_source['value'].type())
         identity_grid = identity_grid.view(1, 1, h, w, 2)
         coordinate_grid = identity_grid - kp_driving['value'].view(bs, self.num_kp, 1, 1, 2)
         
-        if 'hessian' in kp_driving:  # Using Hessian derivative
+        if self.estimate_hessian:  # Use the estimate_hessian parameter
             hessian = kp_source['hessian'].view(bs, self.num_kp, 2, 2)
             hessian = hessian.unsqueeze(-3).unsqueeze(-4)
             hessian = hessian.repeat(1, 1, h, w, 1, 1)
@@ -62,16 +57,11 @@ class DenseMotionNetwork(nn.Module):
 
         driving_to_source = coordinate_grid + kp_source['value'].view(bs, self.num_kp, 1, 1, 2)
 
-        # Adding background feature
         identity_grid = identity_grid.repeat(bs, 1, 1, 1, 1)
         sparse_motions = torch.cat([identity_grid, driving_to_source], dim=1)
         return sparse_motions
 
-
     def create_deformed_source_image(self, source_image, sparse_motions):
-        """
-        Eq 7. in the paper \hat{T}_{s<-d}(z)
-        """
         bs, _, h, w = source_image.shape
         source_repeat = source_image.unsqueeze(1).unsqueeze(1).repeat(1, self.num_kp + 1, 1, 1, 1, 1)
         source_repeat = source_repeat.view(bs * (self.num_kp + 1), -1, h, w)
@@ -107,7 +97,6 @@ class DenseMotionNetwork(nn.Module):
 
         out_dict['deformation'] = deformation
 
-        # Sec. 3.2 in the paper
         if self.occlusion:
             occlusion_map = torch.sigmoid(self.occlusion(prediction))
             out_dict['occlusion_map'] = occlusion_map
