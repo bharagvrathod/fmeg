@@ -1,17 +1,21 @@
 from tqdm import trange
 import torch
-
 from torch.utils.data import DataLoader
-
 from logger import Logger
 from modules.model import GeneratorFullModel, DiscriminatorFullModel
-
 from torch.optim.lr_scheduler import MultiStepLR
-
 from sync_batchnorm import DataParallelWithCallback
-
 from frames_dataset import DatasetRepeater
 
+def remap_state_dict(state_dict):
+    remapped_state_dict = {}
+    for key, value in state_dict.items():
+        if key.startswith("jacobian"):
+            new_key = key.replace("jacobian", "hessian")
+            remapped_state_dict[new_key] = value
+        else:
+            remapped_state_dict[key] = value
+    return remapped_state_dict
 
 def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
     train_params = config['train_params']
@@ -21,7 +25,10 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
     optimizer_kp_detector = torch.optim.Adam(kp_detector.parameters(), lr=train_params['lr_kp_detector'], betas=(0.5, 0.999))
 
     if checkpoint is not None:
-        start_epoch = Logger.load_cpk(checkpoint, generator, discriminator, kp_detector,
+        # Load the checkpoint and remap state_dict keys
+        state_dict = torch.load(checkpoint)
+        remapped_state_dict = remap_state_dict(state_dict)
+        start_epoch = Logger.load_cpk(remapped_state_dict, generator, discriminator, kp_detector,
                                       optimizer_generator, optimizer_discriminator,
                                       None if train_params['lr_kp_detector'] == 0 else optimizer_kp_detector)
     else:
