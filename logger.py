@@ -50,23 +50,33 @@ class Logger:
     @staticmethod
     def load_cpk(checkpoint_path, generator=None, discriminator=None, kp_detector=None,
                  optimizer_generator=None, optimizer_discriminator=None, optimizer_kp_detector=None):
-        checkpoint = torch.load(checkpoint_path)
+        if torch.cuda.is_available():
+            map_location = None
+        else:
+            map_location = 'cpu'
+        checkpoint = torch.load(checkpoint_path, map_location)
         if generator is not None:
-            generator.load_state_dict(checkpoint['generator'])
+            # Modify key 'jacobian' to 'hessian' if necessary
+            generator_state_dict = checkpoint['generator']
+            generator_state_dict = {k.replace('jacobian', 'hessian'): v for k, v in generator_state_dict.items()}
+            generator.load_state_dict(generator_state_dict)
         if kp_detector is not None:
-            kp_detector.load_state_dict(checkpoint['kp_detector'])
+            # Modify key 'jacobian' to 'hessian' if necessary
+            kp_detector_state_dict = checkpoint['kp_detector']
+            kp_detector_state_dict = {k.replace('jacobian', 'hessian'): v for k, v in kp_detector_state_dict.items()}
+            kp_detector.load_state_dict(kp_detector_state_dict)
         if discriminator is not None:
             try:
-               discriminator.load_state_dict(checkpoint['discriminator'])
+                discriminator.load_state_dict(checkpoint['discriminator'])
             except:
-               print ('No discriminator in the state-dict. Dicriminator will be randomly initialized')
+                print('No discriminator in the state-dict. Discriminator will be randomly initialized')
         if optimizer_generator is not None:
             optimizer_generator.load_state_dict(checkpoint['optimizer_generator'])
         if optimizer_discriminator is not None:
             try:
                 optimizer_discriminator.load_state_dict(checkpoint['optimizer_discriminator'])
             except RuntimeError as e:
-                print ('No discriminator optimizer in the state-dict. Optimizer will be not initialized')
+                print('No discriminator optimizer in the state-dict. Optimizer will not be initialized')
         if optimizer_kp_detector is not None:
             optimizer_kp_detector.load_state_dict(checkpoint['optimizer_kp_detector'])
 
@@ -107,7 +117,7 @@ class Visualizer:
         kp_array = spatial_size * (kp_array + 1) / 2
         num_kp = kp_array.shape[0]
         for kp_ind, kp in enumerate(kp_array):
-            rr, cc = circle(kp[1], kp[0], self.kp_size, shape=image.shape[:2])
+            rr, cc = disk(kp[1], kp[0], self.kp_size, shape=image.shape[:2])
             image[rr, cc] = np.array(self.colormap(kp_ind / num_kp))[:3]
         return image
 
@@ -118,7 +128,6 @@ class Visualizer:
     def create_image_column(self, images):
         if self.draw_border:
             images = np.copy(images)
-            images[:, :, [0, -1]] = (1, 1, 1)
             images[:, :, [0, -1]] = (1, 1, 1)
         return np.concatenate(list(images), axis=0)
 
@@ -166,7 +175,6 @@ class Visualizer:
             kp_norm = out['kp_norm']['value'].data.cpu().numpy()
             images.append((prediction, kp_norm))
         images.append(prediction)
-
 
         ## Occlusion map
         if 'occlusion_map' in out:
