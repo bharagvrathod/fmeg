@@ -1,6 +1,7 @@
-from tqdm import trange
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from tqdm import trange
 from logger import Logger
 from modules.model import GeneratorFullModel, DiscriminatorFullModel
 from torch.optim.lr_scheduler import MultiStepLR
