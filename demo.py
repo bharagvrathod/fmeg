@@ -39,7 +39,7 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     if cpu:
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
     else:
-        checkpoint = torch.load(checkpoint_path, strict=False)
+        checkpoint = torch.load(checkpoint_path)
  
     # Handle potential state dictionary key remapping here
     # Example: mapping = {"old_layer_name.weight": "new_layer_name.weight"}
@@ -56,7 +56,7 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     for key, value in checkpoint['generator'].items():
         new_key = mapping.get(key, key)  # Use the mapping or keep the original key
         remapped_generator_state_dict[new_key] = value
-    generator.load_state_dict(remapped_generator_state_dict)
+    generator.load_state_dict(remapped_generator_state_dict, strict=False)
     
     # Apply key remapping to kp_detector state dictionary
     remapped_kp_detector_state_dict = {}
