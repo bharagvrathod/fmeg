@@ -61,12 +61,12 @@ class KPDetector(nn.Module):
 
         if self.hessian is not None:
             hessian_map = self.hessian(feature_map)
-            hessian_map = hessian_map.reshape(final_shape[0], self.num_hessian_maps, 10, final_shape[2],
+            hessian_map = hessian_map.reshape(final_shape[0], self.num_hessian_maps, 4, final_shape[2],
                                               final_shape[3])
             heatmap = heatmap.unsqueeze(2)
 
             hessian = heatmap * hessian_map
-            hessian = hessian.view(final_shape[0], final_shape[1], 10, -1)
+            hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
 
             hessian_matrices = []
             for i in range(0, 10, 3):
@@ -75,7 +75,7 @@ class KPDetector(nn.Module):
                 hessian_matrices.append(hessian_matrix)
 
             hessian_matrices = torch.stack(hessian_matrices, dim=-1)
-            hessian_matrices = hessian_matrices.view(hessian_matrices.shape[0], hessian_matrices.shape[1], 3, 3, -1)
+            hessian_matrices = hessian_matrices.view(hessian_matrices.shape[0], hessian_matrices.shape[1], 2, 2, -1)
             hessian_matrices = hessian_matrices.sum(dim=-1)
             
             out['hessian'] = hessian_matrices
