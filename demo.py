@@ -39,7 +39,7 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     if cpu:
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
     else:
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, strict=False)
  
     # Handle potential state dictionary key remapping here
     # Example: mapping = {"old_layer_name.weight": "new_layer_name.weight"}

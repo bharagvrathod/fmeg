@@ -22,7 +22,7 @@ class KPDetector(nn.Module):
         if estimate_hessian:
             self.num_hessian_maps = 1 if single_hessian_map else num_kp
             self.hessian = nn.Conv2d(in_channels=self.predictor.out_filters,
-                                     out_channels=10 * self.num_hessian_maps, kernel_size=(7, 7), padding=pad)
+                                     out_channels=4 * self.num_hessian_maps, kernel_size=(7, 7), padding=pad)
             self.hessian.weight.data.zero_()
             self.hessian.bias.data.zero_()
         else:
