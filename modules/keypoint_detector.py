@@ -64,8 +64,7 @@ class KPDetector(nn.Module):
             hessian_map = hessian_map.view(final_shape[0], self.num_hessian_maps, 4, -1)
 
             # Ensure heatmap and hessian_map have compatible dimensions
-            heatmap = heatmap.unsqueeze(2)
-            hessian_map = hessian_map.unsqueeze(3)  # Add an extra dimension to match heatmap
+            heatmap = heatmap.unsqueeze(2).unsqueeze(3).expand_as(hessian_map)  # Match dimensions
             hessian = heatmap * hessian_map
             hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
 
@@ -81,4 +80,5 @@ class KPDetector(nn.Module):
             out['hessian'] = hessian_matrices
 
         return out
+
 
