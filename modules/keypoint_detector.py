@@ -46,12 +46,15 @@ class KPDetector(nn.Module):
         return kp
 
     def forward(self, x):
+        # Apply scaling if necessary
         if self.scale_factor != 1:
             x = self.down(x)
 
+        # Obtain feature maps and keypoints prediction
         feature_map = self.predictor(x)
         prediction = self.kp(feature_map)
 
+        # Reshape and apply softmax to the prediction
         final_shape = prediction.shape
         heatmap = prediction.view(final_shape[0], final_shape[1], -1)
         heatmap = F.softmax(heatmap / self.temperature, dim=2)
@@ -61,24 +64,24 @@ class KPDetector(nn.Module):
 
         if self.hessian is not None:
             hessian_map = self.hessian(feature_map)
-            hessian_map = hessian_map.reshape(final_shape[0], self.num_hessian_maps, 4, final_shape[2], final_shape[3])
-            heatmap = heatmap.unsqueeze(2)
+            hessian_map = hessian_map.view(final_shape[0], self.num_hessian_maps, 4, -1)
 
+            # Prepare for computing hessian_matrices
+            heatmap = heatmap.unsqueeze(2)
             hessian = heatmap * hessian_map
             hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
 
             hessian_matrices = []
             for i in range(0, 10, 3):
-                hessian_matrix = hessian[:, :, i:i+3, :]
-                hessian_matrix = hessian_matrix.sum(dim=-1, keepdim=True)  # Keep the dimension for stacking
+                hessian_matrix = hessian[:, :, i:i+3, :].sum(dim=-1, keepdim=True)
                 hessian_matrices.append(hessian_matrix)
 
-            hessian_matrices = torch.cat(hessian_matrices, dim=-1)  # Use torch.cat instead of torch.stack
+            hessian_matrices = torch.cat(hessian_matrices, dim=-1)
             hessian_matrices = hessian_matrices.view(hessian_matrices.shape[0], hessian_matrices.shape[1], 2, 2, -1)
             hessian_matrices = hessian_matrices.sum(dim=-1)
 
             out['hessian'] = hessian_matrices
 
-            return out
+        return out
 
 
