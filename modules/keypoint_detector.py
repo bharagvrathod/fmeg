@@ -46,7 +46,6 @@ class KPDetector(nn.Module):
         return kp
 
     def forward(self, x):
-        
         if self.scale_factor != 1:
             x = self.down(x)
 
@@ -65,7 +64,7 @@ class KPDetector(nn.Module):
             hessian_map = hessian_map.view(final_shape[0], self.num_hessian_maps, 4, -1)
 
             # Reshape heatmap to match hessian_map dimensions
-            heatmap = heatmap.unsqueeze(2).unsqueeze(3).expand(-1, -1, self.num_hessian_maps, -1)
+            heatmap = heatmap.unsqueeze(2).unsqueeze(3).expand(-1, -1, -1, hessian_map.size(-1))
 
             # Perform element-wise multiplication
             hessian = heatmap * hessian_map
@@ -83,6 +82,7 @@ class KPDetector(nn.Module):
             out['hessian'] = hessian_matrices
 
         return out
+
 
 
 
