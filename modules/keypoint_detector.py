@@ -46,15 +46,12 @@ class KPDetector(nn.Module):
         return kp
 
     def forward(self, x):
-        # Apply scaling if necessary
         if self.scale_factor != 1:
             x = self.down(x)
 
-        # Obtain feature maps and keypoints prediction
         feature_map = self.predictor(x)
         prediction = self.kp(feature_map)
 
-        # Reshape and apply softmax to the prediction
         final_shape = prediction.shape
         heatmap = prediction.view(final_shape[0], final_shape[1], -1)
         heatmap = F.softmax(heatmap / self.temperature, dim=2)
@@ -66,8 +63,9 @@ class KPDetector(nn.Module):
             hessian_map = self.hessian(feature_map)
             hessian_map = hessian_map.view(final_shape[0], self.num_hessian_maps, 4, -1)
 
-            # Prepare for computing hessian_matrices
+            # Ensure heatmap and hessian_map have compatible dimensions
             heatmap = heatmap.unsqueeze(2)
+            heatmap = heatmap.expand(-1, -1, self.num_hessian_maps, -1)  # Match dimensions
             hessian = heatmap * hessian_map
             hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
 
@@ -83,5 +81,4 @@ class KPDetector(nn.Module):
             out['hessian'] = hessian_matrices
 
         return out
-
 
