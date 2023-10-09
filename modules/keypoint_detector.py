@@ -59,29 +59,23 @@ class KPDetector(nn.Module):
 
         out = self.gaussian2kp(heatmap)
 
-        if self.hessian is not None:
-            hessian_map = self.hessian(feature_map)
-            hessian_map = hessian_map.view(final_shape[0], self.num_hessian_maps, 4, -1)
+        if self.jacobian is not None:
+            jacobian_map = self.jacobian(feature_map)
+            jacobian_map = jacobian_map.reshape(final_shape[0], self.num_jacobian_maps, 4, final_shape[2], final_shape[3])
+            heatmap = heatmap.unsqueeze(2)
 
-            # Reshape heatmap to match hessian_map dimensions
-            heatmap = heatmap.unsqueeze(2).unsqueeze(3).expand(-1, -1, -1, hessian_map.size(-1))
+            jacobian = heatmap * jacobian_map
+            jacobian = jacobian.view(final_shape[0], final_shape[1], 4, -1)
+            jacobian = jacobian.sum(dim=-1)
+            jacobian = jacobian.view(jacobian.shape[0], jacobian.shape[1], 2, 2)
 
-            # Perform element-wise multiplication
-            hessian = heatmap * hessian_map
-            hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
-
-            hessian_matrices = []
-            for i in range(0, 10, 3):
-                hessian_matrix = hessian[:, :, i:i+3, :].sum(dim=-1, keepdim=True)
-                hessian_matrices.append(hessian_matrix)
-
-            hessian_matrices = torch.cat(hessian_matrices, dim=-1)
-            hessian_matrices = hessian_matrices.view(hessian_matrices.shape[0], hessian_matrices.shape[1], 2, 2, -1)
-            hessian_matrices = hessian_matrices.sum(dim=-1)
-
-            out['hessian'] = hessian_matrices
+            # Calculate the Hessian based on the gradient of the Jacobian
+            hessian = torch.autograd.grad(jacobian, feature_map, torch.ones_like(jacobian), create_graph=True)
+            hessian = torch.cat([h.view(*final_shape)[:, None] for h in hessian], dim=1)
+            out['hessian'] = hessian
 
         return out
+
 
 
 
