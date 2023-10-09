@@ -59,22 +59,15 @@ class KPDetector(nn.Module):
 
         out = self.gaussian2kp(heatmap)
 
-        if self.jacobian is not None:
-            jacobian_map = self.jacobian(feature_map)
-            jacobian_map = jacobian_map.reshape(final_shape[0], self.num_jacobian_maps, 4, final_shape[2], final_shape[3])
-            heatmap = heatmap.unsqueeze(2)
+        if self.hessian is not None:
+            # Assuming self.hessian contains the second-order derivatives
+            hessian = self.hessian(feature_map)
+            hessian = hessian.view(final_shape[0], final_shape[1], 2, 2)
 
-            jacobian = heatmap * jacobian_map
-            jacobian = jacobian.view(final_shape[0], final_shape[1], 4, -1)
-            jacobian = jacobian.sum(dim=-1)
-            jacobian = jacobian.view(jacobian.shape[0], jacobian.shape[1], 2, 2)
-
-            # Calculate the Hessian based on the gradient of the Jacobian
-            hessian = torch.autograd.grad(jacobian, feature_map, torch.ones_like(jacobian), create_graph=True)
-            hessian = torch.cat([h.view(*final_shape)[:, None] for h in hessian], dim=1)
             out['hessian'] = hessian
 
         return out
+
 
 
 
