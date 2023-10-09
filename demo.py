@@ -84,12 +84,16 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         # Ensure that the tensor requires gradients
         hessian_tensor = hessian_tensor.requires_grad_(True)
         
-        gradient = torch.autograd.grad(hessian_tensor, x, create_graph=True, grad_outputs=torch.ones_like(hessian_tensor))[0]
-        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
+        # Create a tensor of ones with the same shape as hessian_tensor
+        ones_like_hessian = torch.ones_like(hessian_tensor)
+        
+        gradient = torch.autograd.grad(hessian_tensor, x, create_graph=True, grad_outputs=ones_like_hessian)[0]
+        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=ones_like_hessian)[0].unsqueeze(-3)
                         for i in range(gradient.size(-1))]
 
         hessian = torch.stack(hessian_rows, dim=-3)
         return hessian
+
 
 
 
