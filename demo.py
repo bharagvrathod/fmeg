@@ -78,34 +78,19 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
     def hessian(y, x, create_graph=False):
-        # Extract the tensor from the dictionary
-        hessian_tensor = y['hessian']
-        
         # Ensure that the tensor requires gradients
-        hessian_tensor.requires_grad_(True)
+        y.requires_grad_(True)
         
-        # Recursively ensure gradients for all tensors within the dictionary
-        def ensure_grad(tensor):
-            if isinstance(tensor, dict):
-                for key, value in tensor.items():
-                    tensor[key] = ensure_grad(value)
-                return tensor
-            elif isinstance(tensor, torch.Tensor):
-                return tensor.requires_grad_(True)
-            else:
-                return tensor
+        # Create a tensor of ones with the same shape as y
+        ones_like_y = torch.ones_like(y)
         
-        hessian_tensor = ensure_grad(hessian_tensor)
-        
-        # Create a tensor of ones with the same shape as hessian_tensor
-        ones_like_hessian = torch.ones_like(hessian_tensor)
-        
-        gradient = torch.autograd.grad(hessian_tensor, x, create_graph=True, grad_outputs=ones_like_hessian)[0]
-        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=ones_like_hessian)[0].unsqueeze(-3)
+        gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=ones_like_y)[0]
+        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=ones_like_y)[0].unsqueeze(-3)
                         for i in range(gradient.size(-1))]
 
         hessian = torch.stack(hessian_rows, dim=-3)
         return hessian
+
 
 
 
