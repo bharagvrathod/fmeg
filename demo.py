@@ -78,11 +78,12 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
     def hessian(y, x, create_graph=False):
-        # Ensure that y is a tensor that requires gradients
-        if not y.requires_grad:
-            y = y.clone().detach().requires_grad_(True)
+        # Ensure that the specific tensor within the dictionary requires gradients
+        hessian_tensor = y['hessian']
+        if not hessian_tensor.requires_grad:
+            hessian_tensor = hessian_tensor.clone().detach().requires_grad_(True)
 
-        gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=torch.ones_like(y))[0]
+        gradient = torch.autograd.grad(hessian_tensor, x, create_graph=True, grad_outputs=torch.ones_like(hessian_tensor))[0]
         hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
                         for i in range(gradient.size(-1))]
 
