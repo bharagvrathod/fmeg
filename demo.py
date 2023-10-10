@@ -76,44 +76,56 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
 
 
+def hessian(y, x, create_graph=False):
+    # Ensure that y requires gradients
+    y.requires_grad_(True)
+
+    gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=torch.ones_like(y))[0]
+    hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
+                    for i in range(gradient.size(-1))]
+
+    hessian = torch.cat(hessian_rows, dim=-3)
+    return hessian
+
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
-    def hessian(y, x, create_graph=False):
-        # Ensure that the specific tensor within the dictionary requires gradients
-        hessian_tensor = y['hessian']
-        if not hessian_tensor.requires_grad:
-            hessian_tensor = hessian_tensor.clone().detach().requires_grad_(True)
+    def normalize_kp(kp):
+        kp = kp - kp.mean(axis=0, keepdims=True)
+        area = ConvexHull(kp[:, :2]).volume
+        area = np.sqrt(area)
+        kp[:, :2] = kp[:, :2] / area
+        return kp
 
-        gradient = torch.autograd.grad(hessian_tensor, x, create_graph=True, grad_outputs=torch.ones_like(hessian_tensor))[0]
-        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
-                        for i in range(gradient.size(-1))]
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
+                                      device='cpu' if cpu else 'cuda')
 
-        hessian = torch.cat(hessian_rows, dim=-3)
-        return hessian
+    source_image = resize(source_image, (256, 256))[..., :3]
+    driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
 
+    predictions = []
+    source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
+    if not cpu:
+        source = source.cuda()
+    driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3)
+    kp_source = kp_detector(source)
+    kp_driving_initial = kp_detector(driving[:, :, 0])
 
-    with torch.no_grad():
-        predictions = []
-        source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
+    for frame_idx in tqdm(range(driving.shape[2])):
+        driving_frame = driving[:, :, frame_idx]
         if not cpu:
-            source = source.cuda()
-        driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3)
-        kp_source = kp_detector(source)
-        kp_driving_initial = kp_detector(driving[:, :, 0])
+            driving_frame = driving_frame.cuda()
+        kp_driving = kp_detector(driving_frame)
+        kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
+                               kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
+                               use_relative_hessian=relative, adapt_movement_scale=adapt_movement_scale)
 
-        for frame_idx in tqdm(range(driving.shape[2])):
-            driving_frame = driving[:, :, frame_idx]
-            if not cpu:
-                driving_frame = driving_frame.cuda()
-            kp_driving = kp_detector(driving_frame)
-            kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
-                                   kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
-                                   use_relative_hessian=relative, adapt_movement_scale=adapt_movement_scale)  # Change: use_relative_hessian
+        # Set requires_grad=True for kp_norm before using it to compute the Hessian
+        kp_norm.requires_grad_(True)
+        kp_norm_hessian = hessian(kp_norm, driving_frame)
 
-            kp_norm_hessian = hessian(kp_norm, driving_frame)
+        out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)
 
-            out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)  # Use Hessian gradient  # Change: kp_norm_hessian
+        predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
 
-            predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
     return predictions
 
 # Function to find the best frame (optional)
