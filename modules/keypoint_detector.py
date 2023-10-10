@@ -61,18 +61,12 @@ class KPDetector(nn.Module):
 
         if self.hessian is not None:
             # Assuming self.hessian contains the second-order derivatives
-            hessian_map = self.hessian(feature_map)
-            hessian_map = hessian_map.reshape(final_shape[0], self.num_hessian_maps, 4, final_shape[2], final_shape[3])
-            heatmap = heatmap.unsqueeze(2)
+            hessian = self.hessian(feature_map)
+            hessian = hessian.view(final_shape[0], final_shape[1], 2, 2)
 
-            hessian = heatmap * hessian_map
-            hessian = hessian.view(final_shape[0], final_shape[1], 4, -1)
-            hessian = hessian.sum(dim=-1)
-            hessian = hessian.view(hessian.shape[0], hessian.shape[1], 2, 2)
             out['hessian'] = hessian
 
         return out
-
 
 
 
