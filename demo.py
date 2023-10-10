@@ -109,7 +109,6 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         # Create a new dictionary with the updated keypoint coordinates
         kp_new = {
             'value': kp_new_coords,
-            'index': kp_driving['index'],  # You can include the 'index' key if needed
         }
 
         return kp_new
