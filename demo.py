@@ -88,24 +88,17 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         hessian = torch.stack(hessian_rows, dim=-3)
         return hessian
 
-    # Ensure that driving_video is a list of image frames
-    if isinstance(driving_video, str):
-        reader = imageio.get_reader(driving_video)
-        driving_video = [frame for frame in reader]
-        reader.close()
-
     with torch.no_grad():
         predictions = []
         source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
         if not cpu:
             source = source.cuda()
-        
-        driving_frames = torch.tensor(np.array(driving_video).astype(np.float32)).permute(0, 3, 1, 2)
+        driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3)
         kp_source = kp_detector(source)
-        kp_driving_initial = kp_detector(driving_frames[:, :, 0])
+        kp_driving_initial = kp_detector(driving[:, :, 0])
 
-        for frame_idx in tqdm(range(driving_frames.shape[0])):
-            driving_frame = driving_frames[frame_idx]
+        for frame_idx in tqdm(range(driving.shape[2])):
+            driving_frame = driving[:, :, frame_idx]
             if not cpu:
                 driving_frame = driving_frame.cuda()
             kp_driving = kp_detector(driving_frame)
@@ -119,7 +112,6 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
 
             predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
     return predictions
-
 
 
 # Function to find the best frame (optional)
