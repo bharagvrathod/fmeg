@@ -77,24 +77,16 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
-    def hessian(y, x, create_graph=False):
-        # Ensure that the tensor requires gradients
-        y.requires_grad_(True)
+    def hessian(y, x):
+        # Compute the Jacobian of gradients
+        gradient = torch.autograd.grad(y, x, create_graph=True)[0]
         
-        # Create a tensor of ones with the same shape as y
-        ones_like_y = torch.ones_like(y)
-        
-        gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=ones_like_y)[0]
-        hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=ones_like_y)[0].unsqueeze(-3)
+        # Compute the Hessian from the Jacobian
+        hessian_rows = [torch.autograd.grad(gradient[..., i], x, retain_graph=True)[0].unsqueeze(-3)
                         for i in range(gradient.size(-1))]
 
         hessian = torch.stack(hessian_rows, dim=-3)
         return hessian
-
-
-
-
-
 
     with torch.no_grad():
         predictions = []
@@ -112,14 +104,15 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
             kp_driving = kp_detector(driving_frame)
             kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
                                    kp_driving_initial=kp_driving_initial, use_relative_movement=relative,
-                                   use_relative_hessian=relative, adapt_movement_scale=adapt_movement_scale)  # Change: use_relative_hessian
-
+                                   use_relative_hessian=relative, adapt_movement_scale=adapt_movement_scale)
+            
             kp_norm_hessian = hessian(kp_norm, driving_frame)
 
-            out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)  # Use Hessian gradient  # Change: kp_norm_hessian
+            out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)
 
             predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
     return predictions
+
 
 # Function to find the best frame (optional)
 def find_best_frame(source, driving, cpu=False):
