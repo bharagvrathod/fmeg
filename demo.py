@@ -82,7 +82,20 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         hessian_tensor = y['hessian']
         
         # Ensure that the tensor requires gradients
-        hessian_tensor = hessian_tensor.requires_grad_(True)
+        hessian_tensor.requires_grad_(True)
+        
+        # Recursively ensure gradients for all tensors within the dictionary
+        def ensure_grad(tensor):
+            if isinstance(tensor, dict):
+                for key, value in tensor.items():
+                    tensor[key] = ensure_grad(value)
+                return tensor
+            elif isinstance(tensor, torch.Tensor):
+                return tensor.requires_grad_(True)
+            else:
+                return tensor
+        
+        hessian_tensor = ensure_grad(hessian_tensor)
         
         # Create a tensor of ones with the same shape as hessian_tensor
         ones_like_hessian = torch.ones_like(hessian_tensor)
@@ -93,6 +106,7 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
 
         hessian = torch.stack(hessian_rows, dim=-3)
         return hessian
+
 
 
 
