@@ -91,18 +91,29 @@ def hessian(y, x, create_graph=False):
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
     def normalize_kp(kp_driving, kp_source, kp_driving_initial, use_relative_movement, use_relative_hessian, adapt_movement_scale):
+        kp_driving_coords = kp_driving['value']
+        kp_source_coords = kp_source['value']
+        kp_driving_initial_coords = kp_driving_initial['value']
+
         if use_relative_movement:
-            kp_new = kp_source + (kp_driving - kp_driving_initial)
+            kp_new_coords = kp_source_coords + (kp_driving_coords - kp_driving_initial_coords)
         else:
-            kp_new = kp_driving
+            kp_new_coords = kp_driving_coords
 
         if use_relative_hessian:
-            kp_new = kp_new - kp_new.mean(1, keepdim=True)
+            kp_new_coords = kp_new_coords - kp_new_coords.mean(1, keepdim=True)
 
         if adapt_movement_scale:
-            kp_new = kp_new * kp_driving_initial.std(1, keepdim=True) / (kp_new.std(1, keepdim=True) + 1e-8)
+            kp_new_coords = kp_new_coords * kp_driving_initial_coords.std(1, keepdim=True) / (kp_new_coords.std(1, keepdim=True) + 1e-8)
+
+        # Create a new dictionary with the updated keypoint coordinates
+        kp_new = {
+            'value': kp_new_coords,
+            'index': kp_driving['index'],  # You can include the 'index' key if needed
+        }
 
         return kp_new
+
 
     fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
                                       device='cpu' if cpu else 'cuda')
