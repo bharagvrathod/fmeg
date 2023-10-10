@@ -91,12 +91,24 @@ def hessian(y, x, create_graph=False):
     return hessian
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True, cpu=False):
-    def normalize_kp(kp):
-        kp = kp - kp.mean(axis=0, keepdims=True)
-        area = ConvexHull(kp[:, :2]).volume
-        area = np.sqrt(area)
-        kp[:, :2] = kp[:, :2] / area
-        return kp
+    def normalize_kp(kp_source, kp_driving, kp_driving_initial, use_relative_movement, use_relative_hessian, adapt_movement_scale):
+        if use_relative_movement:
+            kp_new_coords = kp_source['value'] + (kp_driving['value'] - kp_driving_initial['value'])
+        else:
+            kp_new_coords = kp_driving['value']
+
+        if adapt_movement_scale:
+            mean_distance = torch.mean(torch.norm(kp_driving_initial['value'][:, :2] - kp_source['value'][:, :2], dim=1, keepdim=True))
+            kp_new_coords[:, :2] = kp_source['value'][:, :2] + (kp_new_coords[:, :2] - kp_driving_initial['value'][:, :2]) * \
+                                (torch.mean(torch.norm(kp_driving['value'][:, :2] - kp_driving_initial['value'][:, :2], dim=1, keepdim=True)) / (mean_distance + 1e-8))
+
+        kp_new = {
+            'value': kp_new_coords,
+            'index': kp_source['index'],  # You can include the 'index' key if needed
+        }
+
+        return kp_new
+
 
     fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True, device='cpu' if cpu else 'cuda')
 
