@@ -113,6 +113,13 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
 
         return kp_new
 
+
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
+                                      device='cpu' if cpu else 'cuda')
+
+    source_image = resize(source_image, (256, 256))[..., :3]
+    driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
+
     predictions = []
     source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
     if not cpu:
@@ -126,10 +133,15 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         if not cpu:
             driving_frame = driving_frame.cuda()
         kp_driving = kp_detector(driving_frame)
-        kp_norm = normalize_kp(kp_driving, kp_source, kp_driving_initial, relative, relative, adapt_movement_scale)
+        kp_norm = normalize_kp(kp_driving=kp_driving,
+                               kp_source=kp_source,
+                               kp_driving_initial=kp_driving_initial,
+                               use_relative_movement=relative,
+                               use_relative_hessian=relative,
+                               adapt_movement_scale=adapt_movement_scale)
 
-        # Set requires_grad=True for kp_norm's value before using it to compute the Hessian
-        kp_norm['value'].requires_grad_(True)
+        # Set requires_grad=True for kp_norm before using it to compute the Hessian
+        kp_norm.requires_grad_(True)
         kp_norm_hessian = hessian(kp_norm, driving_frame)
 
         out = generator(source, kp_source=kp_source, kp_driving=kp_norm_hessian)
@@ -137,7 +149,6 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
 
     return predictions
-
 
 # Function to find the best frame (optional)
 def find_best_frame(source, driving, cpu=False):
