@@ -79,10 +79,10 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
 
 
 def hessian(y, x, create_graph=False):
-    # Ensure that y['value'] requires gradients
-    y['value'].requires_grad_(True)
+    # Ensure that y requires gradients
+    y.requires_grad_(True)
 
-    gradient = torch.autograd.grad(y['value'], x, create_graph=True, grad_outputs=torch.ones_like(y['value']))[0]
+    gradient = torch.autograd.grad(y, x, create_graph=True, grad_outputs=torch.ones_like(y))[0]
     hessian_rows = [torch.autograd.grad(gradient[..., i], x, create_graph=create_graph, grad_outputs=torch.ones_like(gradient))[0].unsqueeze(-3)
                     for i in range(gradient.size(-1))]
 
