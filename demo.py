@@ -117,9 +117,10 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
     fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
                                       device='cpu' if cpu else 'cuda')
 
-    source_image = resize(source_image, (256, 256))[..., :3]
-    driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
-
+    #source_image = resize(source_image, (256, 256))[..., :3]
+    #driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
+    print(driving_video.shape)
+    print(source_image.shape)
     predictions = []
     source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
     if not cpu:
